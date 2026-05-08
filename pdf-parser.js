@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const { createCanvas } = require('canvas');
 const { PDFParse } = require('pdf-parse');
-const { pdfToPng } = require('pdf-to-png-converter');
 
 const OUTPUT_JSON = 'output.json';
 const IMAGE_DIR = 'question_images';
@@ -24,17 +24,41 @@ async function renderPdfPages(filePath) {
 
   console.log("🖼️ Rendering PDF pages to images...");
 
-  const pdfBuffer = fs.readFileSync(filePath);
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
-  const pages = await pdfToPng(pdfBuffer, {
-    viewportScale: 2.0,
-    outputFolder: IMAGE_DIR,
-    outputFileMask: 'page',
-    pagesToProcess: []
+  const data = new Uint8Array(fs.readFileSync(filePath));
+
+  const loadingTask = pdfjsLib.getDocument({
+    data,
+    disableWorker: true
   });
 
-  console.log(`✅ Rendered ${pages.length} PDF pages`);
-  return pages;
+  const pdf = await loadingTask.promise;
+  const renderedPages = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 2.0 });
+
+    const canvas = createCanvas(viewport.width, viewport.height);
+    const context = canvas.getContext('2d');
+
+    await page.render({
+      canvasContext: context,
+      viewport
+    }).promise;
+
+    const imagePath = path.join(IMAGE_DIR, `page-${pageNumber}.png`);
+    fs.writeFileSync(imagePath, canvas.toBuffer('image/png'));
+
+    renderedPages.push({
+      pageNumber,
+      path: imagePath
+    });
+  }
+
+  console.log(`✅ Rendered ${renderedPages.length} PDF pages`);
+  return renderedPages;
 }
 
 function cleanText(text) {
@@ -49,7 +73,8 @@ function cleanText(text) {
 function extractAnswerChoices(answerBlock) {
   const choices = [];
 
-  const choiceRegex = /(?:^|\n)\s*([A-D])\s*\n([\s\S]*?)(?=\n\s*[A-D]\s*\n|\n\s*Correct Answer:|$)/g;
+  const choiceRegex =
+    /(?:^|\n)\s*([A-D])\s*\n([\s\S]*?)(?=\n\s*[A-D]\s*\n|\n\s*Correct Answer:|$)/g;
 
   let match;
   while ((match = choiceRegex.exec(answerBlock)) !== null) {
@@ -67,10 +92,10 @@ function getPageNumberFromBlock(block) {
   return pageMatch ? Number(pageMatch[1]) : null;
 }
 
-async function copyPageImageForQuestion(questionId, pageNumber, renderedPages) {
+function copyPageImageForQuestion(questionId, pageNumber, renderedPages) {
   if (!questionId || !pageNumber) return null;
 
-  const page = renderedPages[pageNumber - 1];
+  const page = renderedPages.find(p => p.pageNumber === pageNumber);
 
   if (!page || !page.path) {
     console.log(`⚠️ Could not find rendered image for page ${pageNumber}`);
@@ -112,7 +137,7 @@ async function processQuestionBank(filePath) {
       const answerBlock = answerBlockMatch ? answerBlockMatch[1] : '';
       const answerChoices = extractAnswerChoices(answerBlock);
 
-      const questionImage = await copyPageImageForQuestion(
+      const questionImage = copyPageImageForQuestion(
         id,
         pageNumber,
         renderedPages
