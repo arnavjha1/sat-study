@@ -7,14 +7,32 @@ const OUTPUT_JSON = 'output.json';
 const IMAGE_DIR = 'question_images';
 
 async function getPdfText(filePath) {
-  const dataBuffer = fs.readFileSync(filePath);
+  console.log("📖 Extracting text with pdfjs-dist...");
 
-  const parser = new PDFParse({ data: dataBuffer });
-  const result = await parser.getText();
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const data = new Uint8Array(fs.readFileSync(filePath));
 
-  await parser.destroy();
+  const loadingTask = pdfjsLib.getDocument({
+    data,
+    disableWorker: true
+  });
 
-  return result.text;
+  const pdf = await loadingTask.promise;
+
+  let fullText = '';
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const textContent = await page.getTextContent();
+
+    const pageText = textContent.items
+      .map(item => item.str)
+      .join('\n');
+
+    fullText += `\n${pageText}\n-- ${pageNumber} of ${pdf.numPages} --\n`;
+  }
+
+  return fullText;
 }
 
 async function renderPdfPages(filePath) {
