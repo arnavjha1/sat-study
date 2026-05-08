@@ -34,7 +34,6 @@ async function getPdfText(filePath) {
 
   return fullText;
 }
-
 async function renderPdfPages(filePath) {
   if (!fs.existsSync(IMAGE_DIR)) {
     fs.mkdirSync(IMAGE_DIR);
@@ -48,7 +47,8 @@ async function renderPdfPages(filePath) {
 
   const loadingTask = pdfjsLib.getDocument({
     data,
-    disableWorker: true
+    disableWorker: true,
+    useSystemFonts: true
   });
 
   const pdf = await loadingTask.promise;
@@ -56,23 +56,39 @@ async function renderPdfPages(filePath) {
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
     const page = await pdf.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 2.0 });
 
-    const canvas = createCanvas(viewport.width, viewport.height);
+    const scale = 2.0;
+    const viewport = page.getViewport({ scale });
+
+    const canvas = createCanvas(
+      Math.ceil(viewport.width),
+      Math.ceil(viewport.height)
+    );
+
     const context = canvas.getContext('2d');
 
-    await page.render({
+    // Fill background first
+    context.fillStyle = 'white';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    const renderContext = {
       canvasContext: context,
-      viewport
-    }).promise;
+      viewport,
+      background: 'white'
+    };
+
+    await page.render(renderContext).promise;
 
     const imagePath = path.join(IMAGE_DIR, `page-${pageNumber}.png`);
+
     fs.writeFileSync(imagePath, canvas.toBuffer('image/png'));
 
     renderedPages.push({
       pageNumber,
       path: imagePath
     });
+
+    console.log(`✅ Rendered page ${pageNumber}/${pdf.numPages}`);
   }
 
   console.log(`✅ Rendered ${renderedPages.length} PDF pages`);
