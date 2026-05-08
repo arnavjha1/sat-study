@@ -1,45 +1,69 @@
 const fs = require('fs');
-const pdf = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 
-/**
- * Extracts text from the PDF, removes page headers, 
- * and returns structured data.
- */
+async function getPdfText(filePath) {
+  const dataBuffer = fs.readFileSync(filePath);
+
+  const parser = new PDFParse({ data: dataBuffer });
+  const result = await parser.getText();
+
+  await parser.destroy();
+
+  return result.text;
+}
+
 async function processQuestionBank(filePath) {
-    try {
-        const dataBuffer = fs.readFileSync(filePath);
-        const data = await pdf(dataBuffer);
-        
-        // 1. Clean the text by removing "--- PAGE X ---" headers
-        // This regex matches the pattern found in your file
-        const cleanedText = data.text.replace(/--- PAGE \d+ ---/g, '');
+  try {
+    console.log("🚀 Starting PDF processing...");
 
-        // 2. Split the text into individual question blocks
-        // The file uses "Question ID:" as the primary separator
-        const questions = cleanedText.split(/Question ID:\s+/).filter(q => q.trim());
+    const text = await getPdfText(filePath);
 
-        return questions.map(block => parseBlock(block));
-    } catch (error) {
-        console.error("Error processing file:", error);
+    console.log(`📝 Extracted text length: ${text.length}`);
+
+    const cleanedText = text
+      .replace(/--- PAGE \d+ ---/g, '')
+      .replace(/-- \d+ of \d+ --/g, '');
+
+    const questionBlocks = cleanedText
+      .split(/Question ID:\s+/)
+      .filter(q => q.trim());
+
+    console.log(`🔍 Found ${questionBlocks.length} question blocks`);
+
+    const results = questionBlocks.map(block => {
+      const idMatch = block.match(/^([a-z0-9]+)/i);
+      const questionMatch = block.match(/Question\s*([\s\S]*?)\s*Answer/);
+      const answerMatch = block.match(/Correct Answer:\s*([A-D])/);
+      const rationaleMatch = block.match(/Rationale\s*([\s\S]*)$/);
+
+      return {
+        id: idMatch ? idMatch[1] : null,
+        question: questionMatch ? questionMatch[1].trim() : null,
+        correctAnswer: answerMatch ? answerMatch[1] : null,
+        rationale: rationaleMatch ? rationaleMatch[1].trim() : null
+      };
+    });
+
+    return results;
+
+  } catch (error) {
+    console.error("❌ Error processing file:", error);
+  }
+}
+
+processQuestionBank('./college_board_pdfs/sat-information-ideas.pdf')
+  .then(results => {
+    if (!results) {
+      console.log("⚠️ No results returned");
+      return;
     }
-}
 
-/**
- * Helper to parse individual question components
- */
-function parseBlock(block) {
-    return {
-        id: block.match(/^([a-z0-9]+)/i)?.[1],
-        // Extracts the "Question" section text
-        questionText: block.match(/Question\n([\s\S]*?)\nAnswer/)?.[1].trim(),
-        // Extracts the "Correct Answer" letter
-        correctAnswer: block.match(/Correct Answer:\s+([A-D])/)?.[1],
-        // Extracts the Rationale
-        rationale: block.match(/Rationale\n([\s\S]*)$/)?.[1].trim()
-    };
-}
+    fs.writeFileSync(
+      'output.json',
+      JSON.stringify(results, null, 2),
+      'utf8'
+    );
 
-// Example Usage:
-processQuestionBank('./questionbank-export-2026-5-5.pdf').then(results => {
-    console.log("Extracted Questions (Headers Removed):", results);
-});
+    console.log(`🎯 Extracted ${results.length} questions`);
+    console.log("✅ Saved pretty JSON to output.json");
+  });
