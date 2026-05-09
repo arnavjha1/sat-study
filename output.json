@@ -1,8 +1,15 @@
 [
   {
     "id": null,
-    "questionImage": null,
+    "metadata": {
+      "test": null,
+      "domain": null,
+      "skill": null,
+      "difficulty": null
+    },
     "pageNumber": 1,
+    "questionText": "ID:\n \nf1bfbed3\n\nAssessment\n \nT\nest\n \nDomain\n \nSkill\n \nDifficulty\n\nSA\nT\n \nReading\n \nand\n \nWriting\n \nInformation\n \nand\n \nIdeas\n \nInferences\n \nHard\n\nQuestion\n\nMar ta\n \nColl\n \nand\n \ncolleagues’\n \n2010\n \nMediterr\nanean\n \nSea\n \nbiodiversity\n \ncensus\n \nrepor ted\n \napproximately\n \n17,000\n \nspecies,\n \nnearly\n \ndouble\n \nthe\n \nnumber\nrepor ted\n \nin\n \nCarlo\n \nBianchi\n \nand\n \nCarla\n \nMorri’\ns\n \n2000\n \ncensus—a\n \ndifference\n \nonly\n \npar tly\n \nattributable\n \nto\n \nthe\n \ndescription\n \nof\n \nnew\n \ninver tebr\nate\n \nspecies\n \nin\n \nthe\ninterim.\n \nAnother\n \nfactor\n \nis\n \nthat\n \nthe\n \nmorphological\n \nvariability\n \nof\n \nmicroorganisms\n \nis\n \npoorly\n \nunderstood\n \ncompared\n \nto\n \nthat\n \nof\n \nver tebr\nates,\ninver tebr\nates,\n \nplants,\n \nand\n \nalgae,\n \ncreating\n \nuncer tainty\n \nabout\n \nhow\n \nto\n \nevaluate\n \nmicroorganisms\n \nas\n \nspecies.\n \nResearchers’\n \ndecisions\n \non\n \nsuch\n \nmatters\ntherefore\n \ncan\n \nbe\n \nhighly\n \nconsequential.\n \nIndeed,\n \nthe\n \ntwo\n \ncensuses\n \nrepor ted\n \nsimilar\n \ncounts\n \nof\n \nver tebr\nate,\n \nplant,\n \nand\n \nalgal\n \nspecies,\n \nsuggesting\n \nthat\n\n______\n\nWhich\n \nchoice\n \nmost\n \nlogically\n \ncompletes\n \nthe\n \ntext?",
+    "questionImage": null,
     "answerChoices": [
       {
         "choice": "D",

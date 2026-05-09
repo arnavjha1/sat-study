@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PDFParse } = require('pdf-parse');
+const sharp = require('sharp');
 
 const OUTPUT_JSON = 'output.json';
 const IMAGE_DIR = 'question_images';
@@ -78,6 +79,38 @@ function cleanText(text) {
     .trim();
 }
 
+function extractMetadata(block) {
+  const cleanBlock = cleanText(block);
+
+  const metadataMatch = cleanBlock.match(
+    /Assessment\s+Test\s+Domain\s+Skill\s+Difficulty\s+(SAT.*?)\s+Question/
+  );
+
+  if (!metadataMatch) {
+    return {
+      test: null,
+      domain: null,
+      skill: null,
+      difficulty: null
+    };
+  }
+
+  const metadataText = metadataMatch[1];
+
+  const difficultyMatch = metadataText.match(/\b(Easy|Medium|Hard)\b$/);
+
+  return {
+    test: "SAT",
+    domain: metadataText.includes("Reading and Writing")
+      ? "Reading and Writing"
+      : null,
+    skill: metadataText.includes("Information and Ideas")
+      ? "Information and Ideas"
+      : null,
+    difficulty: difficultyMatch ? difficultyMatch[1] : null
+  };
+}
+
 function extractAnswerChoices(answerBlock) {
   const choices = [];
 
@@ -100,7 +133,7 @@ function getPageNumberFromBlock(block) {
   return pageMatch ? Number(pageMatch[1]) : null;
 }
 
-function copyPageImageForQuestion(questionId, pageNumber, renderedPages) {
+async function cropPageImageForQuestion(questionId, pageNumber, renderedPages) {
   if (!questionId || !pageNumber) return null;
 
   const page = renderedPages.find(p => p.pageNumber === pageNumber);
@@ -112,7 +145,22 @@ function copyPageImageForQuestion(questionId, pageNumber, renderedPages) {
 
   const targetPath = path.join(IMAGE_DIR, `${questionId}.png`);
 
-  fs.copyFileSync(page.path, targetPath);
+  const metadata = await sharp(page.path).metadata();
+
+  const left = 80;
+  const top = 80;
+  const width = metadata.width - 160;
+  const height = metadata.height - 180;
+
+  await sharp(page.path)
+    .extract({
+      left,
+      top,
+      width,
+      height
+    })
+    .png()
+    .toFile(targetPath);
 
   return targetPath.replace(/\\/g, '/');
 }
@@ -145,7 +193,14 @@ async function processQuestionBank(filePath) {
       const answerBlock = answerBlockMatch ? answerBlockMatch[1] : '';
       const answerChoices = extractAnswerChoices(answerBlock);
 
-      const questionImage = copyPageImageForQuestion(
+      const metadata = extractMetadata(block);
+
+      const questionTextMatch = block.match(/Question\s*([\s\S]*?)\s*Answer/);
+      const questionText = questionTextMatch
+        ? cleanText(questionTextMatch[1])
+        : null;
+
+      const questionImage = await cropPageImageForQuestion(
         id,
         pageNumber,
         renderedPages
@@ -153,8 +208,10 @@ async function processQuestionBank(filePath) {
 
       results.push({
         id,
-        questionImage,
+        metadata,
         pageNumber,
+        questionText,
+        questionImage,
         answerChoices,
         correctAnswer: correctAnswerMatch ? correctAnswerMatch[1] : null,
         rationale: rationaleMatch ? cleanText(rationaleMatch[1]) : null
