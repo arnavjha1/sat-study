@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const { createCanvas } = require('canvas');
 const { PDFParse } = require('pdf-parse');
 
 const OUTPUT_JSON = 'output.json';
@@ -34,62 +33,37 @@ async function getPdfText(filePath) {
 
   return fullText;
 }
+
 async function renderPdfPages(filePath) {
   if (!fs.existsSync(IMAGE_DIR)) {
     fs.mkdirSync(IMAGE_DIR);
   }
 
-  console.log("🖼️ Rendering PDF pages to images...");
+  console.log("🖼️ Rendering PDF pages to images with Poppler...");
 
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const { Poppler } = await import('node-poppler');
+  const poppler = new Poppler();
 
-  const data = new Uint8Array(fs.readFileSync(filePath));
+  const outputPrefix = path.join(IMAGE_DIR, 'page');
 
-  const loadingTask = pdfjsLib.getDocument({
-    data,
-    disableWorker: true,
-    useSystemFonts: true
+  await poppler.pdfToCairo(filePath, outputPrefix, {
+    pngFile: true,
+    resolutionXYAxis: 200
   });
 
-  const pdf = await loadingTask.promise;
-  const renderedPages = [];
-
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-    const page = await pdf.getPage(pageNumber);
-
-    const scale = 2.0;
-    const viewport = page.getViewport({ scale });
-
-    const canvas = createCanvas(
-      Math.ceil(viewport.width),
-      Math.ceil(viewport.height)
-    );
-
-    const context = canvas.getContext('2d');
-
-    // Fill background first
-    context.fillStyle = 'white';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    const renderContext = {
-      canvasContext: context,
-      viewport,
-      background: 'white'
-    };
-
-    await page.render(renderContext).promise;
-
-    const imagePath = path.join(IMAGE_DIR, `page-${pageNumber}.png`);
-
-    fs.writeFileSync(imagePath, canvas.toBuffer('image/png'));
-
-    renderedPages.push({
-      pageNumber,
-      path: imagePath
+  const files = fs
+    .readdirSync(IMAGE_DIR)
+    .filter(file => /^page-\d+\.png$/.test(file))
+    .sort((a, b) => {
+      const aNum = Number(a.match(/page-(\d+)\.png/)[1]);
+      const bNum = Number(b.match(/page-(\d+)\.png/)[1]);
+      return aNum - bNum;
     });
 
-    console.log(`✅ Rendered page ${pageNumber}/${pdf.numPages}`);
-  }
+  const renderedPages = files.map((file, index) => ({
+    pageNumber: index + 1,
+    path: path.join(IMAGE_DIR, file)
+  }));
 
   console.log(`✅ Rendered ${renderedPages.length} PDF pages`);
   return renderedPages;
