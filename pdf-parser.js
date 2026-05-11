@@ -27,7 +27,7 @@ async function getPdfText(filePath) {
 
     const pageText = textContent.items
       .map(item => item.str)
-      .join('\n');
+      .join(' '); // important: use spaces, not newlines
 
     fullText += `\n${pageText}\n-- ${pageNumber} of ${pdf.numPages} --\n`;
   }
